@@ -13,6 +13,8 @@ import {
   Platform,
 } from 'react-native';
 
+
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing, borderRadius } from '../styles';
 
@@ -308,6 +310,8 @@ const CalendarScreen = () => {
          </View>
        </Modal>
 
+
+
       </SafeAreaView>
    );
  };
@@ -512,6 +516,7 @@ const styles = StyleSheet.create({
     recurrenceButtonTextSelected: {
       color: colors.background,
     },
+
 
   });
 
