@@ -12,6 +12,7 @@ import {
   Keyboard,
   Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 
 
@@ -38,6 +39,7 @@ const CalendarScreen = () => {
   const [eventTitle, setEventTitle] = useState('');
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('none');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Generate calendar days for current month
   const getDaysInMonth = (date: Date) => {
@@ -273,24 +275,35 @@ const CalendarScreen = () => {
                  </TouchableOpacity>
                ))}
              </View>
-             {recurrenceType !== 'none' && (
-               <TextInput
-                 style={styles.input}
-                 placeholder="End date (optional, YYYY-MM-DD)"
-                 placeholderTextColor={colors.secondaryText}
-                 value={recurrenceEndDate ? recurrenceEndDate.toISOString().split('T')[0] : ''}
-                 onChangeText={(text) => {
-                   if (text) {
-                     const date = new Date(text);
-                     if (!isNaN(date.getTime())) {
-                       setRecurrenceEndDate(date);
-                     }
-                   } else {
-                     setRecurrenceEndDate(null);
-                   }
-                 }}
-               />
-             )}
+               {recurrenceType !== 'none' && (
+                 <View style={{ marginBottom: spacing.lg }}>
+                   {showDatePicker ? (
+                     <View>
+                       <Text style={[typography.bodySecondary, { marginBottom: spacing.sm }]}>End Date:</Text>
+                       <DateTimePicker
+                         value={recurrenceEndDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)}
+                         mode="date"
+                         display="default"
+                         onChange={(event, selectedDate) => {
+                           setShowDatePicker(false);
+                           if (selectedDate) {
+                             setRecurrenceEndDate(selectedDate);
+                           }
+                         }}
+                       />
+                     </View>
+                   ) : (
+                     <TouchableOpacity
+                       style={styles.datePickerButton}
+                       onPress={() => setShowDatePicker(true)}
+                     >
+                       <Text style={styles.datePickerText}>
+                         {recurrenceEndDate ? recurrenceEndDate.toDateString() : 'Select end date (optional)'}
+                       </Text>
+                     </TouchableOpacity>
+                   )}
+                 </View>
+               )}
              <View style={styles.modalButtons}>
                <TouchableOpacity
                  style={styles.secondaryButton}
@@ -452,17 +465,30 @@ const styles = StyleSheet.create({
      width: '80%',
      maxWidth: 400,
    },
-   input: {
-     backgroundColor: colors.background,
-     borderWidth: 1,
-     borderColor: colors.borders,
-     borderRadius: borderRadius.small,
-     padding: spacing.inputPadding,
-     fontSize: typography.normal,
-     color: colors.primaryText,
-     marginTop: spacing.md,
-     marginBottom: spacing.md,
-   },
+    input: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.borders,
+      borderRadius: borderRadius.small,
+      padding: spacing.inputPadding,
+      fontSize: typography.normal,
+      color: colors.primaryText,
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+    },
+    datePickerButton: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.borders,
+      borderRadius: borderRadius.small,
+      padding: spacing.inputPadding,
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+    },
+    datePickerText: {
+      fontSize: typography.normal,
+      color: colors.primaryText,
+    },
    modalButtons: {
      flexDirection: 'row',
      justifyContent: 'space-between',
