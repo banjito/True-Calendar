@@ -241,11 +241,16 @@ const CalendarScreen = () => {
               Selected: {selectedDate.toDateString()}
             </Text>
             {getEventsForDate(selectedDate).map((event) => (
-              <Text key={event.id} style={styles.eventText}>
-                • {event.title}
-                {!event.isAllDay && event.startTime && event.endTime ? ` (${event.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${event.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` : ''}
-                {event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
-              </Text>
+              <View key={event.id} style={styles.eventItem}>
+                <Text style={styles.eventBullet}>•</Text>
+                <View style={styles.eventContent}>
+                  <Text style={styles.eventText}>
+                    {event.title}
+                    {!event.isAllDay && event.startTime && event.endTime ? ` (${event.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${event.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` : ''}
+                    {event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
+                  </Text>
+                </View>
+              </View>
             ))}
          </View>
        ) : null}
@@ -320,6 +325,36 @@ const CalendarScreen = () => {
                       End: {endTime ? endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Select time'}
                     </Text>
                   </TouchableOpacity>
+
+                  {showTimePicker && (
+                    <View style={styles.timePickerContainer}>
+                      <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginBottom: spacing.sm }]}>
+                        {showTimePicker === 'start' ? 'Start Time:' : 'End Time:'}
+                      </Text>
+                      <View style={styles.timePickerWrapper}>
+                        <DateTimePicker
+                          value={showTimePicker === 'start' ? (startTime || new Date()) : (endTime || new Date())}
+                          mode="time"
+                          display="spinner"
+                          onChange={(event, selectedTime) => {
+                            if (selectedTime) {
+                              if (showTimePicker === 'start') {
+                                setStartTime(selectedTime);
+                              } else {
+                                setEndTime(selectedTime);
+                              }
+                            }
+                          }}
+                        />
+                      </View>
+                      <TouchableOpacity
+                        style={styles.timePickerDoneButton}
+                        onPress={() => setShowTimePicker(null)}
+                      >
+                        <Text style={styles.timePickerDoneText}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -370,29 +405,6 @@ const CalendarScreen = () => {
                         </Text>
                       </TouchableOpacity>
                     )}
-                  </View>
-                )}
-
-                {showTimePicker && (
-                  <View>
-                    <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginBottom: spacing.sm }]}>
-                      {showTimePicker === 'start' ? 'Start Time:' : 'End Time:'}
-                    </Text>
-                    <DateTimePicker
-                      value={showTimePicker === 'start' ? (startTime || new Date()) : (endTime || new Date())}
-                      mode="time"
-                      display="default"
-                      onChange={(event, selectedTime) => {
-                        setShowTimePicker(null);
-                        if (selectedTime) {
-                          if (showTimePicker === 'start') {
-                            setStartTime(selectedTime);
-                          } else {
-                            setEndTime(selectedTime);
-                          }
-                        }
-                      }}
-                    />
                   </View>
                 )}
              <View style={styles.modalButtons}>
@@ -516,7 +528,7 @@ const styles = StyleSheet.create({
    },
    selectedCell: {
      backgroundColor: colors.primaryText,
-     borderRadius: borderRadius.small,
+     borderRadius: 4,
    },
    selectedText: {
      color: colors.surface,
@@ -527,12 +539,27 @@ const styles = StyleSheet.create({
      borderTopWidth: 1,
      borderTopColor: colors.borders,
    },
-    eventText: {
-      fontSize: 14,
-      fontWeight: '400',
-      color: colors.secondaryText,
-      marginTop: spacing.xs,
-    },
+     eventItem: {
+       flexDirection: 'row',
+       alignItems: 'flex-start',
+       marginTop: spacing.xs,
+     },
+     eventBullet: {
+       fontSize: 14,
+       fontWeight: '400',
+       color: colors.secondaryText,
+       marginRight: spacing.xs,
+       lineHeight: 20,
+     },
+     eventContent: {
+       flex: 1,
+     },
+     eventText: {
+       fontSize: 14,
+       fontWeight: '400',
+       color: colors.secondaryText,
+       lineHeight: 20,
+     },
    fab: {
      position: 'absolute',
      right: spacing.screenPadding,
@@ -688,6 +715,31 @@ const styles = StyleSheet.create({
      timeButtonText: {
        fontSize: 16,
        color: colors.primaryText,
+     },
+     timePickerContainer: {
+       marginTop: spacing.md,
+       marginBottom: spacing.md,
+       padding: spacing.sm,
+       backgroundColor: colors.surface,
+       borderWidth: 1,
+       borderColor: colors.borders,
+       borderRadius: borderRadius.small,
+       overflow: 'hidden',
+     },
+     timePickerWrapper: {
+       marginBottom: spacing.sm,
+       alignItems: 'center',
+     },
+     timePickerDoneButton: {
+       backgroundColor: colors.primaryText,
+       borderRadius: borderRadius.small,
+       padding: spacing.sm,
+       alignItems: 'center',
+     },
+     timePickerDoneText: {
+       color: colors.background,
+       fontSize: 16,
+       fontWeight: '500',
      },
 
 
