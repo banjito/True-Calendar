@@ -8,16 +8,34 @@ import {
   TextInput,
   StatusBar,
   Dimensions,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Platform,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing, borderRadius } from '../styles';
+
+type RecurrenceType = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+
+interface Event {
+  id: number;
+  title: string;
+  date: Date;
+  recurrence: {
+    type: RecurrenceType;
+    endDate?: Date;
+  };
+}
 
 const CalendarScreen = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [events, setEvents] = useState<Record<string, { title: string; id: number }[]>>({});
+  const [events, setEvents] = useState<Event[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('none');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
 
   // Generate calendar days for current month
   const getDaysInMonth = (date: Date) => {
@@ -75,20 +93,51 @@ const CalendarScreen = () => {
 
   const addEvent = () => {
     if (eventTitle.trim() && selectedDate) {
-      const dateKey = selectedDate.toDateString();
-      setEvents(prev => ({
-        ...prev,
-        [dateKey]: [...(prev[dateKey] || []), { title: eventTitle.trim(), id: Date.now() }]
-      }));
+      const newEvent: Event = {
+        id: Date.now(),
+        title: eventTitle.trim(),
+        date: selectedDate,
+        recurrence: {
+          type: recurrenceType,
+          endDate: recurrenceEndDate || undefined,
+        },
+      };
+      setEvents(prev => [...prev, newEvent]);
       setEventTitle('');
+      setRecurrenceType('none');
+      setRecurrenceEndDate(null);
       setModalVisible(false);
     }
   };
 
-  const getEventsForDate = (date: Date | null) => {
+  const doesDateMatchRecurrence = (checkDate: Date, eventDate: Date, recurrence: Event['recurrence']): boolean => {
+    if (recurrence.type === 'none') return checkDate.toDateString() === eventDate.toDateString();
+    if (recurrence.endDate && checkDate > recurrence.endDate) return false;
+
+    const diffTime = checkDate.getTime() - eventDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    switch (recurrence.type) {
+      case 'daily':
+        return diffDays >= 0;
+      case 'weekly':
+        return diffDays >= 0 && diffDays % 7 === 0;
+      case 'biweekly':
+        return diffDays >= 0 && diffDays % 14 === 0;
+      case 'monthly':
+        return checkDate.getDate() === eventDate.getDate() && checkDate >= eventDate;
+      case 'yearly':
+        return checkDate.getMonth() === eventDate.getMonth() &&
+               checkDate.getDate() === eventDate.getDate() &&
+               checkDate >= eventDate;
+      default:
+        return false;
+    }
+  };
+
+  const getEventsForDate = (date: Date | null): Event[] => {
     if (!date) return [];
-    const dateKey = date.toDateString();
-    return events[dateKey] || [];
+    return events.filter(event => doesDateMatchRecurrence(date, event.date, event.recurrence));
   };
 
   return (
@@ -162,9 +211,9 @@ const CalendarScreen = () => {
            <Text style={typography.bodyPrimary}>
              Selected: {selectedDate.toDateString()}
            </Text>
-           {getEventsForDate(selectedDate).map((event: { title: string; id: number }) => (
+           {getEventsForDate(selectedDate).map((event) => (
              <Text key={event.id} style={styles.eventText}>
-               • {event.title}
+               • {event.title}{event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
              </Text>
            ))}
          </View>
@@ -179,48 +228,89 @@ const CalendarScreen = () => {
            setModalVisible(true);
          }}
        >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+         <Text style={styles.fabText}>+</Text>
+       </TouchableOpacity>
 
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={typography.headingMedium}>Add Event</Text>
+       <Modal
+         animationType="fade"
+         transparent={true}
+         visible={modalVisible}
+         onRequestClose={() => setModalVisible(false)}
+       >
+         <View style={styles.modalOverlay}>
+           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+             <View style={styles.modalContent}>
+             <Text style={typography.headingMedium}>Add Event</Text>
              <Text style={typography.bodySecondary}>
                {selectedDate ? selectedDate.toDateString() : new Date().toDateString()}
              </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Event title"
-              placeholderTextColor={colors.secondaryText}
-              value={eventTitle}
-              onChangeText={setEventTitle}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={typography.bodyPrimary}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={addEvent}
-              >
-                <Text style={styles.primaryButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
-  );
-};
+             <TextInput
+               style={styles.input}
+               placeholder="Event title"
+               placeholderTextColor={colors.secondaryText}
+               value={eventTitle}
+               onChangeText={setEventTitle}
+             />
+             <Text style={[typography.bodySecondary, { marginTop: spacing.md }]}>Recurrence:</Text>
+             <View style={styles.recurrenceOptions}>
+               {(['none', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'] as RecurrenceType[]).map((type) => (
+                 <TouchableOpacity
+                   key={type}
+                   style={[
+                     styles.recurrenceButton,
+                     recurrenceType === type && styles.recurrenceButtonSelected,
+                   ]}
+                   onPress={() => setRecurrenceType(type)}
+                 >
+                   <Text style={[
+                     styles.recurrenceButtonText,
+                     recurrenceType === type && styles.recurrenceButtonTextSelected,
+                   ]}>
+                     {type.charAt(0).toUpperCase() + type.slice(1)}
+                   </Text>
+                 </TouchableOpacity>
+               ))}
+             </View>
+             {recurrenceType !== 'none' && (
+               <TextInput
+                 style={styles.input}
+                 placeholder="End date (optional, YYYY-MM-DD)"
+                 placeholderTextColor={colors.secondaryText}
+                 value={recurrenceEndDate ? recurrenceEndDate.toISOString().split('T')[0] : ''}
+                 onChangeText={(text) => {
+                   if (text) {
+                     const date = new Date(text);
+                     if (!isNaN(date.getTime())) {
+                       setRecurrenceEndDate(date);
+                     }
+                   } else {
+                     setRecurrenceEndDate(null);
+                   }
+                 }}
+               />
+             )}
+             <View style={styles.modalButtons}>
+               <TouchableOpacity
+                 style={styles.secondaryButton}
+                 onPress={() => setModalVisible(false)}
+               >
+                 <Text style={typography.bodyPrimary}>Cancel</Text>
+               </TouchableOpacity>
+               <TouchableOpacity
+                 style={styles.primaryButton}
+                 onPress={addEvent}
+               >
+                 <Text style={styles.primaryButtonText}>Add</Text>
+               </TouchableOpacity>
+             </View>
+             </View>
+           </TouchableWithoutFeedback>
+         </View>
+       </Modal>
+
+      </SafeAreaView>
+   );
+ };
 
 const styles = StyleSheet.create({
   container: {
@@ -391,11 +481,38 @@ const styles = StyleSheet.create({
      flex: 1,
      marginLeft: spacing.sm,
    },
-   primaryButtonText: {
-     color: colors.background,
-     fontSize: typography.normal,
-     fontWeight: typography.medium,
-   },
- });
+    primaryButtonText: {
+      color: colors.background,
+      fontSize: typography.normal,
+      fontWeight: typography.medium,
+    },
+    recurrenceOptions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    recurrenceButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borders,
+      borderRadius: borderRadius.small,
+      padding: spacing.sm,
+      marginRight: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    recurrenceButtonSelected: {
+      backgroundColor: colors.primaryText,
+      borderColor: colors.primaryText,
+    },
+    recurrenceButtonText: {
+      ...typography.bodySecondary,
+      color: colors.primaryText,
+    },
+    recurrenceButtonTextSelected: {
+      color: colors.background,
+    },
+
+  });
 
 export default CalendarScreen;
