@@ -155,11 +155,11 @@ const CalendarScreen = () => {
           <Text style={styles.navButtonText}>‹</Text>
         </TouchableOpacity>
 
-        <View style={styles.headerTitle}>
-          <Text style={typography.headingMedium}>
-            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-          </Text>
-        </View>
+         <View style={styles.headerTitle}>
+           <Text style={{ fontSize: 20, fontWeight: '600', color: colors.primaryText }}>
+             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+           </Text>
+         </View>
 
         <TouchableOpacity
           style={styles.navButton}
@@ -180,24 +180,26 @@ const CalendarScreen = () => {
         <View style={styles.calendar}>
           <View style={styles.daysGrid}>
             {days.map((date, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.dayCell,
-                  { height: cellHeight },
-                  isSelected(date) && styles.selectedCell,
-                ]}
-                onPress={() => date && setSelectedDate(date)}
-                disabled={!date}
-              >
+               <TouchableOpacity
+                 key={index}
+                 style={[
+                   styles.dayCell,
+                   { height: cellHeight },
+                   isSelected(date) && styles.selectedCell,
+                   isToday(date) && styles.todayCell,
+                 ]}
+                 onPress={() => date && setSelectedDate(date)}
+                 disabled={!date}
+               >
                {date && (
                  <View style={styles.dayContent}>
-                    <Text
-                      style={[
-                        styles.dayText,
-                        isSelected(date) && styles.selectedText,
-                      ]}
-                    >
+                     <Text
+                       style={[
+                         styles.dayText,
+                         isSelected(date) && styles.selectedText,
+                         isToday(date) && styles.todayText,
+                       ]}
+                     >
                      {date.getDate()}
                    </Text>
                    {getEventsForDate(date).length > 0 && (
@@ -212,9 +214,9 @@ const CalendarScreen = () => {
 
        {selectedDate ? (
          <View style={styles.selectedDateInfo}>
-           <Text style={typography.bodyPrimary}>
-             Selected: {selectedDate.toDateString()}
-           </Text>
+            <Text style={{ fontSize: 16, fontWeight: '400', color: colors.primaryText }}>
+              Selected: {selectedDate.toDateString()}
+            </Text>
            {getEventsForDate(selectedDate).map((event) => (
              <Text key={event.id} style={styles.eventText}>
                • {event.title}{event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
@@ -244,10 +246,10 @@ const CalendarScreen = () => {
          <View style={styles.modalOverlay}>
            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
              <View style={styles.modalContent}>
-             <Text style={typography.headingMedium}>Add Event</Text>
-             <Text style={typography.bodySecondary}>
-               {selectedDate ? selectedDate.toDateString() : new Date().toDateString()}
-             </Text>
+              <Text style={{ fontSize: 20, fontWeight: '600', color: colors.primaryText }}>Add Event</Text>
+              <Text style={{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }}>
+                {selectedDate ? selectedDate.toDateString() : new Date().toDateString()}
+              </Text>
              <TextInput
                style={styles.input}
                placeholder="Event title"
@@ -255,7 +257,7 @@ const CalendarScreen = () => {
                value={eventTitle}
                onChangeText={setEventTitle}
              />
-             <Text style={[typography.bodySecondary, { marginTop: spacing.md }]}>Recurrence:</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginTop: spacing.md }]}>Recurrence:</Text>
              <View style={styles.recurrenceOptions}>
                {(['none', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'] as RecurrenceType[]).map((type) => (
                  <TouchableOpacity
@@ -279,7 +281,7 @@ const CalendarScreen = () => {
                  <View style={{ marginBottom: spacing.lg }}>
                    {showDatePicker ? (
                      <View>
-                       <Text style={[typography.bodySecondary, { marginBottom: spacing.sm }]}>End Date:</Text>
+                        <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginBottom: spacing.sm }]}>End Date:</Text>
                        <DateTimePicker
                          value={recurrenceEndDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)}
                          mode="date"
@@ -309,7 +311,7 @@ const CalendarScreen = () => {
                  style={styles.secondaryButton}
                  onPress={() => setModalVisible(false)}
                >
-                 <Text style={typography.bodyPrimary}>Cancel</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '400', color: colors.primaryText }}>Cancel</Text>
                </TouchableOpacity>
                <TouchableOpacity
                  style={styles.primaryButton}
@@ -358,10 +360,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navButtonText: {
-    ...typography.headingMedium,
-    color: colors.primaryText,
-  },
+   navButtonText: {
+     fontSize: 20,
+     fontWeight: '600',
+     color: colors.primaryText,
+   },
    weekdays: {
      flexDirection: 'row',
      paddingHorizontal: spacing.screenPadding,
@@ -369,11 +372,13 @@ const styles = StyleSheet.create({
      borderBottomWidth: 1,
      borderBottomColor: colors.borders,
    },
-  weekdayText: {
-    ...typography.bodySecondary,
-    flex: 1,
-    textAlign: 'center',
-  },
+   weekdayText: {
+     fontSize: 14,
+     fontWeight: '400',
+     color: colors.secondaryText,
+     flex: 1,
+     textAlign: 'center',
+   },
     calendar: {
       height: 6 * 80 + 32, // 6 rows * cellHeight + padding
       justifyContent: 'center',
@@ -401,34 +406,38 @@ const styles = StyleSheet.create({
      backgroundColor: colors.primaryText,
      marginTop: 2,
    },
-  dayText: {
-    ...typography.bodyPrimary,
-  },
-  todayCell: {
-    backgroundColor: colors.accent,
-    borderRadius: borderRadius.small,
-  },
-  todayText: {
-    color: colors.surface,
-    fontWeight: typography.semibold,
-  },
+   dayText: {
+     fontSize: 16,
+     fontWeight: '400',
+     color: colors.primaryText,
+   },
+   todayCell: {
+     borderWidth: 1,
+     borderColor: colors.accent,
+     borderRadius: borderRadius.small,
+   },
+   todayText: {
+     fontWeight: '600',
+   },
   selectedCell: {
     backgroundColor: colors.primaryText,
     borderRadius: borderRadius.small,
   },
-  selectedText: {
-    color: colors.surface,
-    fontWeight: typography.semibold,
-  },
+   selectedText: {
+     color: colors.surface,
+     fontWeight: '600',
+   },
    selectedDateInfo: {
      padding: spacing.screenPadding,
      borderTopWidth: 1,
      borderTopColor: colors.borders,
    },
-   eventText: {
-     ...typography.bodySecondary,
-     marginTop: spacing.xs,
-   },
+    eventText: {
+      fontSize: 14,
+      fontWeight: '400',
+      color: colors.secondaryText,
+      marginTop: spacing.xs,
+    },
    fab: {
      position: 'absolute',
      right: spacing.screenPadding,
@@ -445,11 +454,11 @@ const styles = StyleSheet.create({
      shadowRadius: 4,
      elevation: 5,
    },
-   fabText: {
-     fontSize: 24,
-     color: colors.background,
-     fontWeight: 'bold',
-   },
+    fabText: {
+      fontSize: 24,
+      color: colors.background,
+      fontWeight: '600',
+    },
    modalOverlay: {
      flex: 1,
      backgroundColor: 'rgba(0, 0, 0, 0.85)',
@@ -465,17 +474,17 @@ const styles = StyleSheet.create({
      width: '80%',
      maxWidth: 400,
    },
-    input: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.borders,
-      borderRadius: borderRadius.small,
-      padding: spacing.inputPadding,
-      fontSize: typography.normal,
-      color: colors.primaryText,
-      marginTop: spacing.md,
-      marginBottom: spacing.md,
-    },
+     input: {
+       backgroundColor: colors.background,
+       borderWidth: 1,
+       borderColor: colors.borders,
+       borderRadius: borderRadius.small,
+       padding: spacing.inputPadding,
+       fontSize: 16,
+       color: colors.primaryText,
+       marginTop: spacing.md,
+       marginBottom: spacing.md,
+     },
     datePickerButton: {
       backgroundColor: colors.background,
       borderWidth: 1,
@@ -485,10 +494,10 @@ const styles = StyleSheet.create({
       marginTop: spacing.md,
       marginBottom: spacing.md,
     },
-    datePickerText: {
-      fontSize: typography.normal,
-      color: colors.primaryText,
-    },
+     datePickerText: {
+       fontSize: 16,
+       color: colors.primaryText,
+     },
    modalButtons: {
      flexDirection: 'row',
      justifyContent: 'space-between',
@@ -511,11 +520,11 @@ const styles = StyleSheet.create({
      flex: 1,
      marginLeft: spacing.sm,
    },
-    primaryButtonText: {
-      color: colors.background,
-      fontSize: typography.normal,
-      fontWeight: typography.medium,
-    },
+     primaryButtonText: {
+       color: colors.background,
+       fontSize: 16,
+       fontWeight: '500',
+     },
     recurrenceOptions: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -535,10 +544,11 @@ const styles = StyleSheet.create({
       backgroundColor: colors.primaryText,
       borderColor: colors.primaryText,
     },
-    recurrenceButtonText: {
-      ...typography.bodySecondary,
-      color: colors.primaryText,
-    },
+     recurrenceButtonText: {
+       fontSize: 14,
+       fontWeight: '400',
+       color: colors.primaryText,
+     },
     recurrenceButtonTextSelected: {
       color: colors.background,
     },
