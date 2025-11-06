@@ -6,13 +6,16 @@
 - **Monthly Calendar View**: Clean grid layout with proper date navigation
 - **Date Selection**: Tap to select dates, visual feedback for today and selected dates
 - **Event Management**: Create, store, and display events for specific dates
-- **Event Indicators**: Small dots show dates with events
+- **Time-Based Events**: Support for timed events with start/end times and all-day toggle
+- **Event Indicators**: Small dots show dates with events (elongated for timed events)
 - **Modal Interface**: Clean event creation modal following TrueCSS design
-- **Persistent Storage**: Events stored in app state (ready for AsyncStorage upgrade)
+- **Persistent Storage**: Events saved to AsyncStorage with automatic load/save
 
 ### UI/UX ✅
 - **TrueCSS Design**: Pure black/white/gray minimal theme
-- **Mobile Optimized**: Proper safe area handling, balanced spacing, 60px day cells
+- **Mobile Optimized**: Proper safe area handling, balanced spacing, 70px day cells
+- **Dynamic Calendar Sizing**: Calendar height adapts to actual month length (4-6 rows)
+- **Selection Boundary Fix**: Selected dates stay within calendar boundaries
 - **Navigation**: Month navigation with arrow buttons
 - **Status Bar**: Light content for proper contrast
 - **Floating Action Button**: + button for adding events
@@ -131,8 +134,8 @@
 
 ### High Priority (Essential)
 1. Recurring events - Core calendar functionality
-2. Time-based events - More precise scheduling
-3. AsyncStorage persistence - Don't lose user data
+2. ✅ Time-based events - More precise scheduling
+3. ✅ AsyncStorage persistence - Don't lose user data
 4. Push notifications - Event reminders
 5. Week/Day views - Better time management
 
