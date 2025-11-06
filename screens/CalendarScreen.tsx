@@ -284,12 +284,12 @@ const CalendarScreen = () => {
                          value={recurrenceEndDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)}
                          mode="date"
                          display="default"
-                         onChange={(event, selectedDate) => {
-                           setShowDatePicker(false);
-                           if (selectedDate) {
-                             setRecurrenceEndDate(selectedDate);
-                           }
-                         }}
+                       onChange={(event, selectedDate) => {
+                         setShowDatePicker(false);
+                         if (selectedDate && selectedDate >= selectedDate) {
+                           setRecurrenceEndDate(selectedDate);
+                         }
+                       }}
                        />
                      </View>
                    ) : (
