@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 
+export type ViewMode = 'month' | 'twoweeks' | 'week';
+
 export interface Event {
   id: number;
   title: string;
@@ -16,6 +18,7 @@ export interface Event {
 }
 
 const EVENTS_STORAGE_KEY = '@true_calendar_events';
+const VIEWMODE_STORAGE_KEY = '@true_calendar_viewmode';
 
 export const saveEvents = async (events: Event[]): Promise<void> => {
   try {
@@ -66,5 +69,24 @@ export const clearEvents = async (): Promise<void> => {
   } catch (error) {
     console.error('Error clearing events:', error);
     throw error;
+  }
+};
+
+export const saveViewMode = async (viewMode: ViewMode): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(VIEWMODE_STORAGE_KEY, viewMode);
+  } catch (error) {
+    console.error('Error saving view mode:', error);
+    throw error;
+  }
+};
+
+export const loadViewMode = async (): Promise<ViewMode> => {
+  try {
+    const viewMode = await AsyncStorage.getItem(VIEWMODE_STORAGE_KEY);
+    return (viewMode as ViewMode) || 'month';
+  } catch (error) {
+    console.error('Error loading view mode:', error);
+    return 'month';
   }
 };

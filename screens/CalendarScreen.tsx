@@ -10,16 +10,18 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius } from '../styles';
-import { Event, RecurrenceType, saveEvents, loadEvents } from '../utils/storage';
+import { Event, RecurrenceType, saveEvents, loadEvents, ViewMode, saveViewMode, loadViewMode } from '../utils/storage';
 
 const CalendarScreen = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [modalVisible, setModalVisible] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [isAllDay, setIsAllDay] = useState(true);
@@ -30,17 +32,19 @@ const CalendarScreen = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState<'start' | 'end' | null>(null);
 
-  // Load events from storage on component mount
+  // Load events and viewMode from storage on component mount
   useEffect(() => {
-    const loadStoredEvents = async () => {
+    const loadStoredData = async () => {
       try {
         const storedEvents = await loadEvents();
         setEvents(storedEvents);
+        const storedViewMode = await loadViewMode();
+        setViewMode(storedViewMode);
       } catch (error) {
-        console.error('Failed to load events:', error);
+        console.error('Failed to load data:', error);
       }
     };
-    loadStoredEvents();
+    loadStoredData();
   }, []);
 
   // Save events to storage whenever events change
@@ -54,6 +58,18 @@ const CalendarScreen = () => {
     };
     saveEventsToStorage();
   }, [events]);
+
+  // Save viewMode to storage whenever it changes
+  useEffect(() => {
+    const saveViewModeToStorage = async () => {
+      try {
+        await saveViewMode(viewMode);
+      } catch (error) {
+        console.error('Failed to save view mode:', error);
+      }
+    };
+    saveViewModeToStorage();
+  }, [viewMode]);
 
   // Generate calendar days for current month
   const getDaysInMonth = (date: Date) => {
@@ -79,19 +95,116 @@ const CalendarScreen = () => {
     return days;
   };
 
-   const days = getDaysInMonth(currentDate);
-   const monthNames = [
-     'January', 'February', 'March', 'April', 'May', 'June',
-     'July', 'August', 'September', 'October', 'November', 'December'
-   ];
+  // Get the start of the week for a given date (Sunday)
+  const getStartOfWeek = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day;
+    return new Date(d.setDate(diff));
+  };
 
-   // Fixed cell height for uniform appearance across screens
-   const cellHeight = 70;
+  // Get days for the current view mode
+  const getDaysForView = (mode: ViewMode, date: Date) => {
+    if (mode === 'month') {
+      return getDaysInMonth(date);
+    } else if (mode === 'week') {
+      const startOfWeek = getStartOfWeek(date);
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        days.push(new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i));
+      }
+      return days;
+    } else if (mode === 'twoweeks') {
+      const startOfWeek = getStartOfWeek(date);
+      const days = [];
+      for (let i = 0; i < 14; i++) {
+        days.push(new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i));
+      }
+      return days;
+    }
+    return [];
+  };
 
-  const navigateMonth = (direction: number) => {
+    const days = getDaysForView(viewMode, currentDate);
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    // Get title for the current view
+    const getViewTitle = (mode: ViewMode, dates: (Date | null)[]) => {
+      const validDates = dates.filter(d => d !== null) as Date[];
+      if (validDates.length === 0) return '';
+
+      if (mode === 'month') {
+        return `${monthNames[validDates[0].getMonth()]} ${validDates[0].getFullYear()}`;
+      } else {
+        const start = validDates[0];
+        const end = validDates[validDates.length - 1];
+        const startMonth = monthNames[start.getMonth()].slice(0, 3);
+        const endMonth = monthNames[end.getMonth()].slice(0, 3);
+        const startDay = start.getDate();
+        const endDay = end.getDate();
+        const year = start.getFullYear();
+        if (startMonth === endMonth) {
+          return `${startMonth} ${startDay}–${endDay}, ${year}`;
+        } else {
+          return `${startMonth} ${startDay}–${endMonth} ${endDay}, ${year}`;
+        }
+      }
+    };
+
+    // Dynamic cell height based on view mode
+    const getCellHeight = (mode: ViewMode) => {
+      switch (mode) {
+        case 'month': return 70;
+        case 'twoweeks': return 100;
+        case 'week': return 140;
+        default: return 70;
+      }
+    };
+    const cellHeight = getCellHeight(viewMode);
+
+  const navigatePeriod = (direction: number) => {
     const newDate = new Date(currentDate);
-    newDate.setMonth(newDate.getMonth() + direction);
+    if (viewMode === 'month') {
+      newDate.setMonth(newDate.getMonth() + direction);
+    } else if (viewMode === 'twoweeks') {
+      newDate.setDate(newDate.getDate() + direction * 14);
+    } else if (viewMode === 'week') {
+      newDate.setDate(newDate.getDate() + direction * 7);
+    }
     setCurrentDate(newDate);
+  };
+
+  const onGestureEvent = (event: any) => {
+    // Handle gesture if needed, but we'll use onHandlerStateChange
+  };
+
+  const onHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      const threshold = 20;
+      const velocityThreshold = 300;
+
+      if (Math.abs(translationX) > threshold || Math.abs(velocityX) > velocityThreshold) {
+        if (translationX > 0 || velocityX > velocityThreshold) {
+          // Swipe right or fast right: zoom out
+          if (viewMode === 'twoweeks') {
+            setViewMode('month');
+          } else if (viewMode === 'week') {
+            setViewMode('twoweeks');
+          }
+        } else if (translationX < 0 || velocityX < -velocityThreshold) {
+          // Swipe left or fast left: zoom in
+          if (viewMode === 'month') {
+            setViewMode('twoweeks');
+          } else if (viewMode === 'twoweeks') {
+            setViewMode('week');
+          }
+        }
+      }
+    }
   };
 
   const isToday = (date: Date | null) => {
@@ -170,20 +283,20 @@ const CalendarScreen = () => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => navigateMonth(-1)}
+          onPress={() => navigatePeriod(-1)}
         >
           <Text style={styles.navButtonText}>‹</Text>
         </TouchableOpacity>
 
-         <View style={styles.headerTitle}>
-           <Text style={{ fontSize: 20, fontWeight: '600', color: colors.primaryText }}>
-             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-           </Text>
-         </View>
+          <View style={styles.headerTitle}>
+            <Text style={{ fontSize: 20, fontWeight: '600', color: colors.primaryText }}>
+              {getViewTitle(viewMode, days)}
+            </Text>
+          </View>
 
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => navigateMonth(1)}
+          onPress={() => navigatePeriod(1)}
         >
           <Text style={styles.navButtonText}>›</Text>
         </TouchableOpacity>
@@ -235,25 +348,32 @@ const CalendarScreen = () => {
          </View>
        </View>
 
-       {selectedDate ? (
-         <View style={styles.selectedDateInfo}>
-            <Text style={{ fontSize: 16, fontWeight: '400', color: colors.primaryText }}>
-              Selected: {selectedDate.toDateString()}
-            </Text>
-            {getEventsForDate(selectedDate).map((event) => (
-              <View key={event.id} style={styles.eventItem}>
-                <Text style={styles.eventBullet}>•</Text>
-                <View style={styles.eventContent}>
-                  <Text style={styles.eventText}>
-                    {event.title}
-                    {!event.isAllDay && event.startTime && event.endTime ? ` (${event.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${event.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` : ''}
-                    {event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
-                  </Text>
-                </View>
-              </View>
-            ))}
-         </View>
-       ) : null}
+        <PanGestureHandler
+          onGestureEvent={onGestureEvent}
+          onHandlerStateChange={onHandlerStateChange}
+          minDeltaX={10}
+          minDeltaY={10}
+          activeOffsetX={[-10, 10]}
+          failOffsetY={[-10, 10]}
+        >
+          <View style={styles.selectedDateInfo}>
+             <Text style={{ fontSize: 16, fontWeight: '400', color: colors.primaryText }}>
+               {selectedDate ? `Selected: ${selectedDate.toDateString()}` : getViewTitle(viewMode, days)}
+             </Text>
+             {selectedDate && getEventsForDate(selectedDate).map((event) => (
+               <View key={event.id} style={styles.eventItem}>
+                 <Text style={styles.eventBullet}>•</Text>
+                 <View style={styles.eventContent}>
+                   <Text style={styles.eventText}>
+                     {event.title}
+                     {!event.isAllDay && event.startTime && event.endTime ? ` (${event.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${event.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` : ''}
+                     {event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
+                   </Text>
+                 </View>
+               </View>
+             ))}
+          </View>
+        </PanGestureHandler>
 
        <TouchableOpacity
          style={styles.fab}
@@ -534,11 +654,12 @@ const styles = StyleSheet.create({
      color: colors.surface,
      fontWeight: '600',
    },
-   selectedDateInfo: {
-     padding: spacing.screenPadding,
-     borderTopWidth: 1,
-     borderTopColor: colors.borders,
-   },
+    selectedDateInfo: {
+      padding: spacing.screenPadding,
+      borderTopWidth: 1,
+      borderTopColor: colors.borders,
+      minHeight: 60,
+    },
      eventItem: {
        flexDirection: 'row',
        alignItems: 'flex-start',
