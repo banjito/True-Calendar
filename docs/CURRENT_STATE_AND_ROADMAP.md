@@ -23,7 +23,7 @@
 - **Navigation**: Month navigation with arrow buttons
 - **Status Bar**: Light content for proper contrast
 - **Floating Action Button**: + button for adding events
-- **Responsive Layout**: Flex-based design that adapts to screen sizes
+- **Responsive Layout**: Flex-based design that adapts to screen sizes, with scrollable modals for dynamic content
 
 ### Technical Foundation ✅
 - **React Native + Expo**: Cross-platform mobile development
@@ -55,7 +55,7 @@
 - **Overlapping events**: Visual indication of conflicts
 
 #### Enhanced Calendar Views
-- **Week View**: 7-day horizontal layout with hourly grid
+- **Week View**: 7-day horizontal layout
 - **Agenda View**: List of upcoming events
 - **Year View**: Mini calendar grid for year overview
 - **View switching**: Toggle between views with bottom navigation
@@ -140,7 +140,7 @@
 2. ✅ Time-based events - More precise scheduling
 3. ✅ AsyncStorage persistence - Don't lose user data
 4. ✅ Push notifications - Event reminders
-5. Week views - Better time management
+5. ✅ Week views - Better time management
 
 ### Medium Priority (Quality of Life)
 1. Event categories - Organization
