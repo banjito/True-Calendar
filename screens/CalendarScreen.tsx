@@ -22,7 +22,7 @@ import { requestNotificationPermissions, scheduleEventNotification, cancelAllNot
 
 const CalendarScreen = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [events, setEvents] = useState<Event[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [modalVisible, setModalVisible] = useState(false);
