@@ -9,6 +9,8 @@ import {
   StatusBar,
   TouchableWithoutFeedback,
   Keyboard,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -16,6 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius } from '../styles';
 import { Event, RecurrenceType, saveEvents, loadEvents, ViewMode, saveViewMode, loadViewMode } from '../utils/storage';
+import { requestNotificationPermissions, scheduleEventNotification, cancelAllNotifications } from '../utils/notifications';
 
 const CalendarScreen = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -29,6 +32,8 @@ const CalendarScreen = () => {
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('none');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
+  const [customDays, setCustomDays] = useState<number[]>([]);
+  const [reminderMinutes, setReminderMinutes] = useState<number | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState<'start' | 'end' | null>(null);
 
@@ -40,6 +45,14 @@ const CalendarScreen = () => {
         setEvents(storedEvents);
         const storedViewMode = await loadViewMode();
         setViewMode(storedViewMode);
+
+        // Reschedule notifications for loaded events
+        await cancelAllNotifications();
+        for (const event of storedEvents) {
+          if (event.reminderMinutes) {
+            await scheduleEventNotification(event);
+          }
+        }
       } catch (error) {
         console.error('Failed to load data:', error);
       }
@@ -222,7 +235,7 @@ const CalendarScreen = () => {
            date.getFullYear() === selectedDate.getFullYear();
   };
 
-  const addEvent = () => {
+  const addEvent = async () => {
     if (eventTitle.trim() && selectedDate) {
       const newEvent: Event = {
         id: Date.now(),
@@ -233,9 +246,20 @@ const CalendarScreen = () => {
         endTime: isAllDay ? undefined : endTime || undefined,
         recurrence: {
           type: recurrenceType,
+          daysOfWeek: recurrenceType === 'custom' ? customDays : undefined,
           endDate: recurrenceEndDate || undefined,
         },
+        reminderMinutes,
       };
+
+      // Schedule notification if reminder is set
+      if (reminderMinutes) {
+        const hasPermission = await requestNotificationPermissions();
+        if (hasPermission) {
+          await scheduleEventNotification(newEvent);
+        }
+      }
+
       setEvents(prev => [...prev, newEvent]);
       setEventTitle('');
       setIsAllDay(true);
@@ -243,6 +267,8 @@ const CalendarScreen = () => {
       setEndTime(null);
       setRecurrenceType('none');
       setRecurrenceEndDate(null);
+      setCustomDays([]);
+      setReminderMinutes(undefined);
       setModalVisible(false);
     }
   };
@@ -259,14 +285,21 @@ const CalendarScreen = () => {
         return diffDays >= 0;
       case 'weekly':
         return diffDays >= 0 && diffDays % 7 === 0;
+      case 'weekdays':
+        const day = checkDate.getDay();
+        return diffDays >= 0 && day >= 1 && day <= 5; // Monday to Friday
       case 'biweekly':
         return diffDays >= 0 && diffDays % 14 === 0;
       case 'monthly':
         return checkDate.getDate() === eventDate.getDate() && checkDate >= eventDate;
       case 'yearly':
         return checkDate.getMonth() === eventDate.getMonth() &&
-               checkDate.getDate() === eventDate.getDate() &&
-               checkDate >= eventDate;
+                checkDate.getDate() === eventDate.getDate() &&
+                checkDate >= eventDate;
+      case 'custom':
+        if (!recurrence.daysOfWeek || recurrence.daysOfWeek.length === 0) return false;
+        const customDay = checkDate.getDay();
+        return diffDays >= 0 && recurrence.daysOfWeek.includes(customDay);
       default:
         return false;
     }
@@ -351,10 +384,6 @@ const CalendarScreen = () => {
         <PanGestureHandler
           onGestureEvent={onGestureEvent}
           onHandlerStateChange={onHandlerStateChange}
-          minDeltaX={10}
-          minDeltaY={10}
-          activeOffsetX={[-10, 10]}
-          failOffsetY={[-10, 10]}
         >
           <View style={styles.selectedDateInfo}>
              <Text style={{ fontSize: 16, fontWeight: '400', color: colors.primaryText }}>
@@ -364,11 +393,11 @@ const CalendarScreen = () => {
                <View key={event.id} style={styles.eventItem}>
                  <Text style={styles.eventBullet}>•</Text>
                  <View style={styles.eventContent}>
-                   <Text style={styles.eventText}>
-                     {event.title}
-                     {!event.isAllDay && event.startTime && event.endTime ? ` (${event.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${event.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` : ''}
-                     {event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
-                   </Text>
+                  <Text style={styles.eventText}>
+                    {event.title}
+                    {!event.isAllDay && event.startTime ? ` (${event.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}${event.endTime ? ` - ${event.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : ''})` : ''}
+                    {event.recurrence.type !== 'none' ? ' (Recurring)' : ''}
+                  </Text>
                  </View>
                </View>
              ))}
@@ -387,15 +416,20 @@ const CalendarScreen = () => {
          <Text style={styles.fabText}>+</Text>
        </TouchableOpacity>
 
-       <Modal
-         animationType="fade"
-         transparent={true}
-         visible={modalVisible}
-         onRequestClose={() => setModalVisible(false)}
-       >
-         <View style={styles.modalOverlay}>
-           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-             <View style={styles.modalContent}>
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <ScrollView
+                style={styles.modalContent}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
               <Text style={{ fontSize: 20, fontWeight: '600', color: colors.primaryText }}>Add Event</Text>
               <Text style={{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }}>
                 {selectedDate ? selectedDate.toDateString() : new Date().toDateString()}
@@ -437,14 +471,14 @@ const CalendarScreen = () => {
                       Start: {startTime ? startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Select time'}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.timeButton}
-                    onPress={() => setShowTimePicker('end')}
-                  >
-                    <Text style={styles.timeButtonText}>
-                      End: {endTime ? endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Select time'}
-                    </Text>
-                  </TouchableOpacity>
+                   <TouchableOpacity
+                     style={styles.timeButton}
+                     onPress={() => setShowTimePicker('end')}
+                   >
+                     <Text style={styles.timeButtonText}>
+                       End: {endTime ? endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Optional'}
+                     </Text>
+                   </TouchableOpacity>
 
                   {showTimePicker && (
                     <View style={styles.timePickerContainer}>
@@ -479,54 +513,105 @@ const CalendarScreen = () => {
               )}
 
                <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginTop: spacing.md }]}>Recurrence:</Text>
-             <View style={styles.recurrenceOptions}>
-               {(['none', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'] as RecurrenceType[]).map((type) => (
-                 <TouchableOpacity
-                   key={type}
-                   style={[
-                     styles.recurrenceButton,
-                     recurrenceType === type && styles.recurrenceButtonSelected,
-                   ]}
-                   onPress={() => setRecurrenceType(type)}
-                 >
-                   <Text style={[
-                     styles.recurrenceButtonText,
-                     recurrenceType === type && styles.recurrenceButtonTextSelected,
-                   ]}>
-                     {type.charAt(0).toUpperCase() + type.slice(1)}
-                   </Text>
-                 </TouchableOpacity>
-               ))}
-             </View>
-                {recurrenceType !== 'none' && (
-                  <View style={{ marginBottom: spacing.lg }}>
-                    {showDatePicker ? (
-                      <View>
-                         <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginBottom: spacing.sm }]}>End Date:</Text>
-                        <DateTimePicker
-                          value={recurrenceEndDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)}
-                          mode="date"
-                          display="default"
-                        onChange={(event, selectedDate) => {
-                          setShowDatePicker(false);
-                          if (selectedDate && selectedDate >= selectedDate) {
-                            setRecurrenceEndDate(selectedDate);
-                          }
-                        }}
-                        />
-                      </View>
-                    ) : (
+              <View style={styles.recurrenceOptions}>
+                {(['none', 'daily', 'weekly', 'weekdays', 'biweekly', 'monthly', 'yearly', 'custom'] as RecurrenceType[]).map((type) => (
+                  <TouchableOpacity
+                    key={`recurrence-${type}`}
+                    style={[
+                      styles.recurrenceButton,
+                      recurrenceType === type && styles.recurrenceButtonSelected,
+                    ]}
+                    onPress={() => setRecurrenceType(type)}
+                  >
+                    <Text style={[
+                      styles.recurrenceButtonText,
+                      recurrenceType === type && styles.recurrenceButtonTextSelected,
+                    ]}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {recurrenceType === 'custom' && (
+                <View style={{ marginBottom: spacing.md }}>
+                  <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginBottom: spacing.sm }]}>Repeat on:</Text>
+                  <View style={styles.daySelector}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
                       <TouchableOpacity
-                        style={styles.datePickerButton}
-                        onPress={() => setShowDatePicker(true)}
+                        key={`day-${index}`}
+                        style={[
+                          styles.dayButton,
+                          customDays.includes(index) && styles.dayButtonSelected,
+                        ]}
+                        onPress={() => {
+                          setCustomDays(prev =>
+                            prev.includes(index)
+                              ? prev.filter(d => d !== index)
+                              : [...prev, index]
+                          );
+                        }}
                       >
-                        <Text style={styles.datePickerText}>
-                          {recurrenceEndDate ? recurrenceEndDate.toDateString() : 'Select end date (optional)'}
+                        <Text style={[
+                          styles.dayButtonText,
+                          customDays.includes(index) && styles.dayButtonTextSelected,
+                        ]}>
+                          {day}
                         </Text>
                       </TouchableOpacity>
-                    )}
+                    ))}
                   </View>
-                )}
+                </View>
+              )}
+                 {recurrenceType !== 'none' && (
+                   <View style={{ marginBottom: spacing.lg }}>
+                     {showDatePicker ? (
+                       <View>
+                          <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginBottom: spacing.sm }]}>End Date:</Text>
+                         <DateTimePicker
+                           value={recurrenceEndDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)}
+                           mode="date"
+                           display="default"
+                         onChange={(event, selectedDate) => {
+                           setShowDatePicker(false);
+                           if (selectedDate && selectedDate >= selectedDate) {
+                             setRecurrenceEndDate(selectedDate);
+                           }
+                         }}
+                         />
+                       </View>
+                     ) : (
+                       <TouchableOpacity
+                         style={styles.datePickerButton}
+                         onPress={() => setShowDatePicker(true)}
+                       >
+                         <Text style={styles.datePickerText}>
+                           {recurrenceEndDate ? recurrenceEndDate.toDateString() : 'Select end date (optional)'}
+                         </Text>
+                       </TouchableOpacity>
+                     )}
+                   </View>
+                 )}
+
+                <Text style={[{ fontSize: 14, fontWeight: '400', color: colors.secondaryText }, { marginTop: spacing.md, marginBottom: spacing.sm }]}>Reminder:</Text>
+                <View style={styles.reminderOptions}>
+                  {[undefined, 0, 5, 15, 30, 60, 1440].map((minutes) => (
+                    <TouchableOpacity
+                      key={`reminder-${minutes ?? 'none'}`}
+                      style={[
+                        styles.reminderButton,
+                        reminderMinutes === minutes && styles.reminderButtonSelected,
+                      ]}
+                      onPress={() => setReminderMinutes(minutes)}
+                    >
+                      <Text style={[
+                        styles.reminderButtonText,
+                        reminderMinutes === minutes && styles.reminderButtonTextSelected,
+                      ]}>
+                        {minutes === undefined ? 'None' : minutes === 0 ? (isAllDay ? 'Morning' : 'At event time') : minutes < 60 ? `${minutes}m before` : minutes === 1440 ? '1 day before' : `${minutes / 60}h before`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
              <View style={styles.modalButtons}>
                <TouchableOpacity
                  style={styles.secondaryButton}
@@ -541,10 +626,10 @@ const CalendarScreen = () => {
                  <Text style={styles.primaryButtonText}>Add</Text>
                </TouchableOpacity>
              </View>
-             </View>
-           </TouchableWithoutFeedback>
-         </View>
-       </Modal>
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
 
 
@@ -708,15 +793,18 @@ const styles = StyleSheet.create({
      justifyContent: 'center',
      alignItems: 'center',
    },
-   modalContent: {
-     backgroundColor: colors.background,
-     borderWidth: 1,
-     borderColor: colors.borders,
-     borderRadius: borderRadius.medium,
-     padding: spacing.screenPadding,
-     width: '80%',
-     maxWidth: 400,
-   },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.borders,
+      borderRadius: borderRadius.medium,
+      width: '80%',
+      maxWidth: 400,
+      maxHeight: Dimensions.get('window').height * 0.8,
+    },
+    modalScrollContent: {
+      padding: spacing.screenPadding,
+    },
      input: {
        backgroundColor: colors.background,
        borderWidth: 1,
@@ -792,9 +880,62 @@ const styles = StyleSheet.create({
        fontWeight: '400',
        color: colors.primaryText,
      },
-     recurrenceButtonTextSelected: {
-       color: colors.background,
-     },
+      recurrenceButtonTextSelected: {
+        color: colors.background,
+      },
+      reminderOptions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: spacing.md,
+      },
+      reminderButton: {
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.borders,
+        borderRadius: borderRadius.small,
+        padding: spacing.sm,
+        marginRight: spacing.sm,
+        marginBottom: spacing.sm,
+      },
+      reminderButtonSelected: {
+        backgroundColor: colors.primaryText,
+        borderColor: colors.primaryText,
+      },
+      reminderButtonText: {
+        fontSize: 14,
+        fontWeight: '400',
+        color: colors.primaryText,
+      },
+      reminderButtonTextSelected: {
+        color: colors.background,
+      },
+      daySelector: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: spacing.sm,
+      },
+      dayButton: {
+        width: 36,
+        height: 36,
+        borderRadius: borderRadius.small,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.borders,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      dayButtonSelected: {
+        backgroundColor: colors.primaryText,
+        borderColor: colors.primaryText,
+      },
+      dayButtonText: {
+        fontSize: 12,
+        fontWeight: '400',
+        color: colors.primaryText,
+      },
+      dayButtonTextSelected: {
+        color: colors.background,
+      },
      allDayToggle: {
        flexDirection: 'row',
        marginTop: spacing.md,

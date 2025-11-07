@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'weekdays' | 'custom';
 
 export type ViewMode = 'month' | 'twoweeks' | 'week';
 
@@ -13,8 +13,10 @@ export interface Event {
   isAllDay: boolean;
   recurrence: {
     type: RecurrenceType;
+    daysOfWeek?: number[];
     endDate?: Date;
   };
+  reminderMinutes?: number; // Minutes before event to send reminder
 }
 
 const EVENTS_STORAGE_KEY = '@true_calendar_events';
@@ -30,8 +32,10 @@ export const saveEvents = async (events: Event[]): Promise<void> => {
       endTime: event.endTime?.toISOString(),
       recurrence: {
         ...event.recurrence,
+        daysOfWeek: event.recurrence.daysOfWeek,
         endDate: event.recurrence.endDate?.toISOString(),
       },
+      reminderMinutes: event.reminderMinutes,
     }));
     await AsyncStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(eventsForStorage));
   } catch (error) {
@@ -54,8 +58,10 @@ export const loadEvents = async (): Promise<Event[]> => {
       endTime: event.endTime ? new Date(event.endTime) : undefined,
       recurrence: {
         ...event.recurrence,
+        daysOfWeek: event.recurrence.daysOfWeek,
         endDate: event.recurrence.endDate ? new Date(event.recurrence.endDate) : undefined,
       },
+      reminderMinutes: event.reminderMinutes,
     }));
   } catch (error) {
     console.error('Error loading events:', error);

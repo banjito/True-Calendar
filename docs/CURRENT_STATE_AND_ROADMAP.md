@@ -3,13 +3,16 @@
 ## Current State
 
 ### Core Features ✅
+- **Multiple Calendar Views**: Month, Week, Agenda, and Year views with gesture-based switching
 - **Monthly Calendar View**: Clean grid layout with proper date navigation
 - **Date Selection**: Tap to select dates, visual feedback for today and selected dates
 - **Event Management**: Create, store, and display events for specific dates
 - **Time-Based Events**: Support for timed events with start/end times and all-day toggle
 - **Event Indicators**: Small dots show dates with events (elongated for timed events)
-- **Modal Interface**: Clean event creation modal with inline time picker
+- **Modal Interface**: Clean, scrollable event creation modal with inline time picker and responsive design
 - **Persistent Storage**: Events saved to AsyncStorage with automatic load/save
+- **Push Notifications**: Configurable reminders for events with permission handling
+- **Advanced Recurrence**: Daily, weekly, weekdays, biweekly, monthly, yearly, and custom day-of-week patterns
 
 ### UI/UX ✅
 - **TrueCSS Design**: Pure black/white/gray minimal theme
@@ -53,7 +56,6 @@
 
 #### Enhanced Calendar Views
 - **Week View**: 7-day horizontal layout with hourly grid
-- **Day View**: Full day with hourly breakdown
 - **Agenda View**: List of upcoming events
 - **Year View**: Mini calendar grid for year overview
 - **View switching**: Toggle between views with bottom navigation
@@ -134,11 +136,11 @@
 ## Recommended Implementation Priorities
 
 ### High Priority (Essential)
-1. Recurring events - Core calendar functionality (partially implemented)
+1. ✅ Recurring events - Core calendar functionality (enhanced with weekdays and custom)
 2. ✅ Time-based events - More precise scheduling
 3. ✅ AsyncStorage persistence - Don't lose user data
-4. Push notifications - Event reminders
-5. Week/Day views - Better time management
+4. ✅ Push notifications - Event reminders
+5. Week views - Better time management
 
 ### Medium Priority (Quality of Life)
 1. Event categories - Organization
