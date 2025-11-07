@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 9.2.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "ios": {
+        "autoIncrement": true
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "john23045@icloud.com",
+        "ascAppId": "6755054477"
+      }
+    }
+  }
+}

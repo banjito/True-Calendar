@@ -5,24 +5,34 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cohn.truecalendar",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.cohn.truecalendar"
     },
     "plugins": [
       [
         "expo-notifications",
         {
-          "icon": "./local/assets/notification-icon.png",
           "color": "#ffffff",
-          "defaultChannel": "default",
-          "sounds": [
-            "./local/assets/notification-sound.wav"
-          ]
+          "defaultChannel": "default"
         }
       ]
-    ]
+    ],
+    "owner": "cohn",
+    "extra": {
+      "eas": {
+        "projectId": "640b5e99-3cfe-4500-94a3-18f815d28b0f"
+      }
+    }
   }
 }
