@@ -75,6 +75,21 @@ export const cancelAllNotifications = async (): Promise<void> => {
   }
 };
 
+// Cancel notifications for a specific event
+export const cancelEventNotifications = async (event: Event): Promise<void> => {
+  try {
+    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+    
+    for (const notification of scheduledNotifications) {
+      if (notification.content.body?.includes(event.title)) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
+  } catch (error) {
+    console.error('Error canceling event notifications:', error);
+  }
+};
+
 // Get all scheduled notifications
 export const getScheduledNotifications = async (): Promise<Notifications.NotificationRequest[]> => {
   try {

@@ -18,7 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius } from '../styles';
 import { Event, RecurrenceType, saveEvents, loadEvents, ViewMode, saveViewMode, loadViewMode } from '../utils/storage';
-import { requestNotificationPermissions, scheduleEventNotification, cancelAllNotifications } from '../utils/notifications';
+import { requestNotificationPermissions, scheduleEventNotification, cancelAllNotifications, cancelEventNotifications } from '../utils/notifications';
 
 const CalendarScreen = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -36,6 +36,9 @@ const CalendarScreen = () => {
   const [reminderMinutes, setReminderMinutes] = useState<number | undefined>(undefined);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState<'start' | 'end' | null>(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteDate, setDeleteDate] = useState<Date | null>(null);
+  const [lastTapTime, setLastTapTime] = useState<{ [key: string]: number }>({});
 
   // Load events and viewMode from storage on component mount
   useEffect(() => {
@@ -274,6 +277,11 @@ const CalendarScreen = () => {
   };
 
   const doesDateMatchRecurrence = (checkDate: Date, eventDate: Date, recurrence: Event['recurrence']): boolean => {
+    // Check if this date is an exception
+    if (recurrence.exceptions && recurrence.exceptions.includes(checkDate.toISOString())) {
+      return false;
+    }
+
     if (recurrence.type === 'none') return checkDate.toDateString() === eventDate.toDateString();
     if (recurrence.endDate && checkDate > recurrence.endDate) return false;
 
@@ -308,6 +316,58 @@ const CalendarScreen = () => {
   const getEventsForDate = (date: Date | null): Event[] => {
     if (!date) return [];
     return events.filter(event => doesDateMatchRecurrence(date, event.date, event.recurrence));
+  };
+
+  const handleDayPress = (date: Date) => {
+    const dateKey = date.toDateString();
+    const now = Date.now();
+    const lastTap = lastTapTime[dateKey] || 0;
+    
+    if (now - lastTap < 300) {
+      // Double tap detected
+      const dayEvents = getEventsForDate(date);
+      if (dayEvents.length > 0) {
+        setDeleteDate(date);
+        setDeleteModalVisible(true);
+      }
+    } else {
+      // Single tap
+      setSelectedDate(date);
+    }
+    
+    setLastTapTime(prev => ({ ...prev, [dateKey]: now }));
+  };
+
+  const deleteEvent = async (eventId: number) => {
+    const eventToDelete = events.find(event => event.id === eventId);
+    if (eventToDelete) {
+      await cancelEventNotifications(eventToDelete);
+    }
+    setEvents(prev => prev.filter(event => event.id !== eventId));
+  };
+
+  const deleteEventInstance = async (eventId: number, date: Date) => {
+    // For recurring events, create an exception for this specific date
+    setEvents(prev => prev.map(event => {
+      if (event.id === eventId && event.recurrence.type !== 'none') {
+        return {
+          ...event,
+          recurrence: {
+            ...event.recurrence,
+            exceptions: [...(event.recurrence.exceptions || []), date.toISOString()]
+          }
+        };
+      }
+      return event;
+    }));
+  };
+
+  const deleteAllRecurring = async (eventId: number) => {
+    const eventToDelete = events.find(event => event.id === eventId);
+    if (eventToDelete) {
+      await cancelEventNotifications(eventToDelete);
+    }
+    setEvents(prev => prev.filter(event => event.id !== eventId));
   };
 
   return (
@@ -345,18 +405,18 @@ const CalendarScreen = () => {
 
         <View style={styles.calendar}>
           <View style={styles.daysGrid}>
-            {days.map((date, index) => (
-               <TouchableOpacity
-                 key={index}
-                 style={[
-                   styles.dayCell,
-                   { height: cellHeight },
-                   isSelected(date) && styles.selectedCell,
-                   isToday(date) && styles.todayCell,
-                 ]}
-                 onPress={() => date && setSelectedDate(date)}
-                 disabled={!date}
-               >
+             {days.map((date, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dayCell,
+                    { height: cellHeight },
+                    isSelected(date) && styles.selectedCell,
+                    isToday(date) && styles.todayCell,
+                  ]}
+                  onPress={() => date && handleDayPress(date)}
+                  disabled={!date}
+                >
                {date && (
                  <View style={styles.dayContent}>
                      <Text
@@ -629,11 +689,90 @@ const CalendarScreen = () => {
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
-        </Modal>
+         </Modal>
 
+         <Modal
+           animationType="fade"
+           transparent={true}
+           visible={deleteModalVisible}
+           onRequestClose={() => setDeleteModalVisible(false)}
+         >
+           <TouchableWithoutFeedback onPress={() => setDeleteModalVisible(false)}>
+             <View style={styles.modalOverlay}>
+               <View style={styles.deleteModalContent}>
+                 <Text style={{ fontSize: 20, fontWeight: '600', color: colors.primaryText, marginBottom: spacing.md }}>
+                   Delete Events
+                 </Text>
+                 <Text style={{ fontSize: 14, fontWeight: '400', color: colors.secondaryText, marginBottom: spacing.lg }}>
+                   {deleteDate ? deleteDate.toDateString() : ''}
+                 </Text>
+                 
+                 <ScrollView style={{ maxHeight: 300, marginBottom: spacing.lg }}>
+                   {deleteDate && getEventsForDate(deleteDate).map((event) => (
+                     <View key={event.id} style={styles.deleteEventItem}>
+                       <View style={styles.deleteEventInfo}>
+                         <Text style={styles.deleteEventTitle}>
+                           {event.title}
+                           {!event.isAllDay && event.startTime ? ` (${event.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}${event.endTime ? ` - ${event.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : ''})` : ''}
+                         </Text>
+                         {event.recurrence.type !== 'none' && (
+                           <Text style={styles.deleteEventRecurring}>Recurring</Text>
+                         )}
+                       </View>
+                       
+                       <View style={styles.deleteSection}>
+                         <Text style={styles.deleteLabel}>Delete:</Text>
+                         <View style={styles.deleteButtons}>
+                           {event.recurrence.type === 'none' ? (
+                             <TouchableOpacity
+                               style={styles.deleteButton}
+                               onPress={() => {
+                                 deleteEvent(event.id);
+                                 setDeleteModalVisible(false);
+                               }}
+                             >
+                               <Text style={styles.deleteButtonText}>Today</Text>
+                             </TouchableOpacity>
+                           ) : (
+                             <>
+                               <TouchableOpacity
+                                 style={[styles.deleteButton, styles.deleteInstanceButton]}
+                                 onPress={() => {
+                                   deleteEventInstance(event.id, deleteDate!);
+                                   setDeleteModalVisible(false);
+                                 }}
+                               >
+                                 <Text style={[styles.deleteButtonText, styles.deleteInstanceButtonText]}>Today</Text>
+                               </TouchableOpacity>
+                               <TouchableOpacity
+                                 style={[styles.deleteButton, styles.deleteAllButton]}
+                                 onPress={() => {
+                                   deleteAllRecurring(event.id);
+                                   setDeleteModalVisible(false);
+                                 }}
+                               >
+                                 <Text style={styles.deleteButtonText}>All</Text>
+                               </TouchableOpacity>
+                             </>
+                           )}
+                         </View>
+                       </View>
+                     </View>
+                   ))}
+                 </ScrollView>
 
+                 <TouchableOpacity
+                   style={styles.closeDeleteModalButton}
+                   onPress={() => setDeleteModalVisible(false)}
+                 >
+                   <Text style={styles.closeDeleteModalText}>Close</Text>
+                 </TouchableOpacity>
+               </View>
+             </View>
+           </TouchableWithoutFeedback>
+         </Modal>
 
-      </SafeAreaView>
+       </SafeAreaView>
    );
  };
 
@@ -998,13 +1137,96 @@ const styles = StyleSheet.create({
        padding: spacing.sm,
        alignItems: 'center',
      },
-     timePickerDoneText: {
-       color: colors.background,
-       fontSize: 16,
-       fontWeight: '500',
-     },
+      timePickerDoneText: {
+        color: colors.background,
+        fontSize: 16,
+        fontWeight: '500',
+      },
+      deleteModalContent: {
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.borders,
+        borderRadius: borderRadius.medium,
+        width: '90%',
+        maxWidth: 500,
+        padding: spacing.screenPadding,
+      },
+      deleteEventItem: {
+        padding: spacing.md,
+        marginBottom: spacing.sm,
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.small,
+        borderWidth: 1,
+        borderColor: colors.borders,
+      },
+      deleteEventInfo: {
+        marginBottom: spacing.sm,
+      },
+      deleteEventTitle: {
+        fontSize: 16,
+        fontWeight: '400',
+        color: colors.primaryText,
+        marginBottom: spacing.xs,
+      },
+      deleteEventRecurring: {
+        fontSize: 12,
+        fontWeight: '400',
+        color: colors.secondaryText,
+        fontStyle: 'italic',
+      },
+      deleteSection: {
+        alignItems: 'flex-start',
+      },
+      deleteLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: colors.primaryText,
+        marginBottom: spacing.xs,
+      },
+      deleteButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+      },
+      deleteButton: {
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.small,
+        backgroundColor: colors.primaryText,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: spacing.xs,
+        minWidth: 70,
+      },
+      deleteInstanceButton: {
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.borders,
+      },
+      deleteAllButton: {
+        backgroundColor: '#ff4444',
+      },
+      deleteButtonText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: colors.background,
+      },
+      deleteInstanceButtonText: {
+        color: colors.primaryText,
+      },
+      closeDeleteModalButton: {
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.borders,
+        borderRadius: borderRadius.small,
+        padding: spacing.md,
+        alignItems: 'center',
+      },
+      closeDeleteModalText: {
+        fontSize: 16,
+        fontWeight: '400',
+        color: colors.primaryText,
+      },
 
-
-   });
+    });
 
 export default CalendarScreen;

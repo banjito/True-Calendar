@@ -15,6 +15,7 @@ export interface Event {
     type: RecurrenceType;
     daysOfWeek?: number[];
     endDate?: Date;
+    exceptions?: string[]; // ISO date strings for exceptions
   };
   reminderMinutes?: number; // Minutes before event to send reminder
 }
@@ -34,6 +35,7 @@ export const saveEvents = async (events: Event[]): Promise<void> => {
         ...event.recurrence,
         daysOfWeek: event.recurrence.daysOfWeek,
         endDate: event.recurrence.endDate?.toISOString(),
+        exceptions: event.recurrence.exceptions,
       },
       reminderMinutes: event.reminderMinutes,
     }));
@@ -60,6 +62,7 @@ export const loadEvents = async (): Promise<Event[]> => {
         ...event.recurrence,
         daysOfWeek: event.recurrence.daysOfWeek,
         endDate: event.recurrence.endDate ? new Date(event.recurrence.endDate) : undefined,
+        exceptions: event.recurrence.exceptions,
       },
       reminderMinutes: event.reminderMinutes,
     }));
